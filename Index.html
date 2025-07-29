@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Snake Game 🐍</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      margin: 0;
+      font-family: sans-serif;
+      background: #111;
+      color: white;
+      text-align: center;
+    }
+
+    #menu, #game-over {
+      padding: 20px;
+    }
+
+    canvas {
+      background: #000;
+      display: none;
+      margin: auto;
+      touch-action: none;
+    }
+
+    .container {
+      margin-top: 50px;
+    }
+
+    #score-board {
+      font-size: 18px;
+      margin: 10px;
+    }
+
+    button {
+      font-size: 18px;
+      padding: 10px 20px;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- MENU -->
+  <div id="menu" class="container">
+    <h1>Jeu Snake 🐍</h1>
+    <label for="color">Couleur du serpent :</label><br>
+    <select id="color">
+      <option value="lime">Vert</option>
+      <option value="red">Rouge</option>
+      <option value="blue">Bleu</option>
+      <option value="yellow">Jaune</option>
+      <option value="white">Blanc</option>
+    </select><br><br>
+    <button onclick="startGame()">Jouer</button>
+  </div>
+
+  <!-- SCORE / NIVEAU -->
+  <div id="score-board" style="display: none;">
+    <span id="score">Score : 0</span> |
+    <span id="level">Niveau : 1</span> |
+    <span id="high-score">Meilleur : 0</span>
+  </div>
+
+  <!-- JEU -->
+  <canvas id="game" width="400" height="400"></canvas>
+
+  <!-- GAME OVER -->
+  <div id="game-over" style="display: none;">
+    <h2>Perdu ! 😢</h2>
+    <p id="final-score"></p>
+    <button onclick="restartGame()">Rejouer</button>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("game");
+    const ctx = canvas.getContext("2d");
+
+    const scale = 20;
+    const rows = canvas.height / scale;
+    const cols = canvas.width / scale;
+
+    let snake, direction, food, snakeColor, interval;
+    let score, level, speed;
+    let bestScore = localStorage.getItem("bestScore") || 0;
+
+    const scoreEl = document.getElementById("score");
+    const levelEl = document.getElementById("level");
+    const highScoreEl = document.getElementById("high-score");
+
+    function startGame() {
+      snakeColor = document.getElementById("color").value;
+      document.getElementById("menu").style.display = "none";
+      document.getElementById("game-over").style.display = "none";
+      canvas.style.display = "block";
+      document.getElementById("score-board").style.display = "block";
+
+      // Initialiser le jeu
+      snake = [{x: 160, y: 160}];
+      direction = {x: scale, y: 0};
+      food = randomFood();
+      score = 0;
+      level = 1;
+      speed = 150;
+
+      updateUI();
+      if (interval) clearInterval(interval);
+      interval = setInterval(draw, speed);
+    }
+
+    function restartGame() {
+      startGame();
+    }
+
+    function updateUI() {
+      scoreEl.innerText = "Score : " + score;
+      levelEl.innerText = "Niveau : " + level;
+      highScoreEl.innerText = "Meilleur : " + bestScore;
+    }
+
+    function randomFood() {
+      return {
+        x: Math.floor(Math.random() * cols) * scale,
+        y: Math.floor(Math.random() * rows) * scale
+      };
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Nourriture
+      ctx.fillStyle = "red";
+      ctx.fillRect(food.x, food.y, scale, scale);
+
+      // Mouvement
+      let head = {
+        x: snake[0].x + direction.x,
+        y: snake[0].y + direction.y
+      };
+
+      snake.unshift(head);
+
+      // Manger
+      if (head.x === food.x && head.y === food.y) {
+        food = randomFood();
+        score++;
+        checkLevelUp();
+      } else {
+        snake.pop();
+      }
+
+      // Dessiner serpent
+      ctx.fillStyle = snakeColor;
+      for (let part of snake) {
+        ctx.fillRect(part.x, part.y, scale, scale);
+      }
+
+      // Collision
+      if (
+        head.x < 0 || head.x >= canvas.width ||
+        head.y < 0 || head.y >= canvas.height ||
+        snake.slice(1).some(p => p.x === head.x && p.y === head.y)
+      ) {
+        clearInterval(interval);
+        gameOver();
+      }
+
+      updateUI();
+    }
+
+    function checkLevelUp() {
+      const newLevel = Math.floor(score / 5) + 1;
+      if (newLevel > level) {
+        level = newLevel;
+        speed = Math.max(50, speed - 10); // Accélère
+        clearInterval(interval);
+        interval = setInterval(draw, speed);
+      }
+    }
+
+    function gameOver() {
+      if (score > bestScore) {
+        bestScore = score;
+        localStorage.setItem("bestScore", bestScore);
+      }
+
+      canvas.style.display = "none";
+      document.getElementById("score-board").style.display = "none";
+      document.getElementById("game-over").style.display = "block";
+      document.getElementById("final-score").innerText =
+        `Score : ${score} | Niveau : ${level} | Meilleur : ${bestScore}`;
+    }
+
+    // Contrôles clavier
+    window.addEventListener("keydown", e => {
+      switch (e.key) {
+        case "ArrowUp": if (direction.y === 0) direction = {x: 0, y: -scale}; break;
+        case "ArrowDown": if (direction.y === 0) direction = {x: 0, y: scale}; break;
+        case "ArrowLeft": if (direction.x === 0) direction = {x: -scale, y: 0}; break;
+        case "ArrowRight": if (direction.x === 0) direction = {x: scale, y: 0}; break;
+      }
+    });
+
+    // Contrôles tactiles
+    let touchStartX = 0;
+    let touchStartY = 0;
+
+    canvas.addEventListener("touchstart", e => {
+      const touch = e.touches[0];
+      touchStartX = touch.clientX;
+      touchStartY = touch.clientY;
+    });
+
+    canvas.addEventListener("touchend", e => {
+      const touch = e.changedTouches[0];
+      const dx = touch.clientX - touchStartX;
+      const dy = touch.clientY - touchStartY;
+
+      if (Math.abs(dx) > Math.abs(dy)) {
+        if (dx > 0 && direction.x === 0) direction = {x: scale, y: 0}; // Droite
+        else if (dx < 0 && direction.x === 0) direction = {x: -scale, y: 0}; // Gauche
+      } else {
+        if (dy > 0 && direction.y === 0) direction = {x: 0, y: scale}; // Bas
+        else if (dy < 0 && direction.y === 0) direction = {x: 0, y: -scale}; // Haut
+      }
+    });
+  </script>
+</body>
+</html>
